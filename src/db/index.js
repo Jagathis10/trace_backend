@@ -1,13 +1,11 @@
-import mongoose from "mongoose";
-const connectDB = async() => {
-    return mongoose
-    .connect("mongodb://127.0.0.1:27017/myfirstdb")
-    .then(() => {
-      console.log(" Database connected successfully");
-    })
-    .catch((err) => {
-      console.error("connection error:", err.message);
-    });
-};
-export default connectDB;
+const mongoose = require('mongoose');
+const connectDB = () => {
+  return mongoose
+  .connect("mongodb://127.0.0.1:27017/myfirstdb")
+  .then(() => console.log("Connected to database"))
+  .catch((e) => {
+    console.error("Error connecting to database", e.message);
+  });
+};  
 
+module.exports = connectDB;

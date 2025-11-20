@@ -1,26 +1,26 @@
-import express from 'express';
-import cors from 'cors';
-
-
-import connectDB from './src/db/index.js'
-import routes from './src/routes/route.js';
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./src/db/index.js');
+const routes = require('./src/routes/route.js');
 
 const app = express();
-const PORT = 3000; 
+const apiPort = 3000;
 connectDB();
 
-// Middleware
-app.use(express.urlencoded({extended:true}))
-app.use(cors("*"));
-app.use(express.json());
-
-//port
-app.listen(PORT, () => {
-  console.log(`Server running at:${PORT}`);
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
 });
 
-// Routes
-app.use('/api', routes);
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+// app.use(cors("*"));
 
+app.use ("/api", routes)
+app.listen(apiPort, () => {
+  console.log(`Server running at:${apiPort}`);
+});
 
-export default app;
+module.exports = app;
