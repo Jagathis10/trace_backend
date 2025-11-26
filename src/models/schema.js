@@ -2,12 +2,16 @@ const mongoose = require('mongoose');
 
 const databaseSchema = new mongoose.Schema(
    {
-    internal_id:{type:String},
+    trace_id:{type:String},
     original_id:{type:String},
+    internal_id:{type:String},
+    accession:{type:String},
     type:{type:String},
-    Specimen:{type:String},
-    Age:{type:String},
-    State:{type:String},
+    tissue:{type:String},
+    age_days:{type:Number},
+    state:{type:String},
+    state_id:{type:String},
+    country:{type:String},
     segment:{type:String},
     gene:{type:String},
     Year:{type:Number},
