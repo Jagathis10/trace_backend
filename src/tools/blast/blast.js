@@ -1,50 +1,57 @@
 const path = require("path");
-const { spawn } = require("child_process");
+const { runCmd } = require("../index.js");
 
-blast = (inputFasta, dbPath, outPath, evalue = 0.001, numThreads = 4) => {
-    return new Promise((resolve, reject) => {
+async function runBlast({
+    program = "blastn",
+    queryFasta,
+    dbPrefix,
+    wordSize = 10,
+    evalue = 1e-5,
+    outfmt = 6,
+    maxTargetSeqs = 10,
+    cwd,
 
-        const blastn = spawn(
-            "blastn",
-            [
-                "-query", inputFasta,
-                "-db", dbPath,
-                "-out", outPath,
-                "-evalue", String(evalue),
-                "-num_threads", String(numThreads),
-                "-outfmt", "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore"
-            ]
-        );
+}) {
+    if (!queryFasta) {
+        throw new Error("queryFasta is required");
+    }
+    if (!dbPrefix) {
+        throw new Error("dbPrefix is required");
+    }
 
-        let stdoutData = "";
-        let stderrData = "";
+    const args = [
+        "-query", queryFasta,
+        "-db", dbPrefix,
+        "-word_size", wordSize.toString(),
+        "-evalue", evalue.toString(),
+        "-outfmt", outfmt.toString(),
+        "-max_target_seqs", maxTargetSeqs.toString(),
+    ];
 
-        blastn.stdout.on("data", (data) => {
-            stdoutData += data.toString();
-        });
+    const cmd = `${program} ${args.join(" ")}`;
+    console.log("Running BLAST command:", cmd);
 
-        blastn.stderr.on("data", (data) => {
-            stderrData += data.toString();
-        });
+    const options = {
+        cwd: cwd || path.dirname(queryFasta),  
 
-        blastn.on("close", (code) => {
+    };
 
-            const result = {
-                code,
-                stdout: stdoutData,
-                stderr: stderrData,
-                files: {
-                    output: outPath
-                },
-            };
+    const {code, stdout, stderr} = await runCmd( program , args, options);
+    // if (code !== 0) {
+    //     throw new Error(`BLAST command failed with code ${code}: ${stderr}`);
+    // }
+    
+    return {
+        code,
+        stdout,
+        stderr,
+        cmd,
+        files: {query: queryFasta, db: dbPrefix},
+    };
+        
 
-            if (code === 0) {
-                return resolve(result);
-            }
 
-            reject(result);
-        });
-    });
 }
 
-module.exports = { blast };
+
+module.exports = { runBlast };

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./src/db/index.js');
 const routes = require('./src/routes/route.js');
-
+const toolsRoutes = require('./src/routes/tools.js');
 
 const app = express();
 const apiPort = 3000;
@@ -26,6 +26,8 @@ app.listen(apiPort, () => {
   console.log(`Server running at:${apiPort}`);
 });
 
+//tools routes
+app.use("/api/tools", toolsRoutes);
 
 
 module.exports = app;
