@@ -26,8 +26,4 @@ app.listen(apiPort, () => {
   console.log(`Server running at:${apiPort}`);
 });
 
-//tools routes
-app.use("/api/tools", toolsRoutes);
-
-
 module.exports = app;

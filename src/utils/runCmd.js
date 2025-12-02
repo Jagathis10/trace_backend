@@ -1,8 +1,8 @@
 const {spawn} = require("child_process");
 
-function runCmd(command, args, options = {}) {
+function runCmd(command, args = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
+    const child = spawn(command, args);
     let stdout = "";
     let stderr = "";
 
@@ -14,15 +14,18 @@ function runCmd(command, args, options = {}) {
         stderr += data.toString();
         });
 
-    child.on("close", (code) => {
-        const result = { code, stdout, stderr };
-        if (code === 0) {
+    child.on("close", () => {
+        const result = { stdout, stderr };
+        console.log(result);
+        if (stderr === "") {
             resolve(result);
         } else {
-            reject(new Error(`Command failed with code ${code}: ${stderr}`));
+            reject(new Error(`Command failed with  ${stderr}`));
         }
     });
   });
 }   
+
+
 
 module.exports = {runCmd};

@@ -2,25 +2,37 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
+
+
 const {runBlast} = require("../tools/blast/blast.js");
+const {runMafft} = require("../tools/mafft/mafft.js");
+const { runClustalw } = require("../tools/clustalw/clustalw.js");
+//const { runIqtree } = require("../tools/iqtree/iqtree.js");
+
 
 
 const router = express.Router();
+
+
 //base dir
 const tmpBaseDir = path.join(__dirname, "../../tmp");
 
 // setting up dir for blast
 const blastTmpDir = path.join(tmpBaseDir, "blast-results");
+const mafftTmpDir = path.join(tmpBaseDir, "mafft-results");
+const clustalwTmpDir = path.join(tmpBaseDir, "clustalw-results");
+//const iqtreeTmpDir = path.join(tmpBaseDir, "iqtree-results");
 
-
-
-const upload = multer({ dest:blastTmpDir});
+const uploadBlast = multer({ dest:blastTmpDir});
+const uploadMafft = multer({ dest:mafftTmpDir});
+const uploadClustalw = multer({ dest:clustalwTmpDir});
+//const uploadIqtree = multer({ dest:iqtreeTmpDir});
 
 //function
 
 //1. get a FASTA file path from either upload or body
 
-function getFastaFile({ file, gdata }) {
+function getFastaFile({ file, gdata,outDir,prefix }) {
   if (file && file.path) {
     console.log("Using uploaded file:", file.path);
     return file.path;
@@ -28,10 +40,14 @@ function getFastaFile({ file, gdata }) {
 
   if (gdata && gdata.trim() !== "") {
     const filePath = path.join(
-      blastTmpDir,
-      `blast_query_${Date.now()}.fasta`
+      outDir,
+      `${prefix || "query"}_${Date.now()}.fasta`
     );
-    fs.writeFileSync(filePath, gdata.trim() + "\n");
+    let text = gdata.trim();
+    if (!text.startsWith(">")) {
+    text = `>query\n${text}`;
+    }
+    fs.writeFileSync(filePath, text + "\n", "utf-8");
     console.log("Using gdata written to file:", filePath);
     return filePath;
   }
@@ -39,9 +55,10 @@ function getFastaFile({ file, gdata }) {
   return null;
 }
 
-
-
-
+//2.take first 10 sequences from our  DB FASTA nt or aa
+// function getDbFasta(fastapath,n){
+//   const data = fs.readFileSync(fastapath,"utf-8").trim();
+//   if (!data) return "";
 
 
 
@@ -58,7 +75,7 @@ function getFastaFile({ file, gdata }) {
  */
 
 
- router.post("/blast", upload.single("file"), async (req, res) => {
+ router.post("/blast", uploadBlast.single("file"), async (req, res) => {
   const {
     gdata,
     program = "blastn",
@@ -68,7 +85,13 @@ function getFastaFile({ file, gdata }) {
     maxTargetSeqs,
   } = req.body;
 
-  const queryPath = getFastaFile({ file: req.file, gdata });
+  const queryPath = getFastaFile({ 
+    file: req.file, 
+    gdata, 
+    outDir: blastTmpDir, 
+    prefix: "blast_input" 
+  });
+
   if (!queryPath) {
     return res
       .status(400)
@@ -116,6 +139,103 @@ function getFastaFile({ file, gdata }) {
     },
   });
 });
+
+//maftt
+router.post("/mafft", uploadMafft.single("file"), async (req, res) => {
+  const{ gdata} = req.body;
+
+  const fastapath = getFastaFile({
+    file: req.file,
+    gdata,
+    outDir: mafftTmpDir,
+    prefix: "mafft_input"
+  });
+
+  if (!fastapath) {
+    return res
+      .status(400)
+      .json({ message: "No FASTA file or gdata provided" });
+  }
+
+  console.log("MAFFT request body:", req.body);
+  
+  //run mafft
+  const results = await runMafft({
+    inputFasta: fastapath,
+    cwd: mafftTmpDir,
+    extraArgs: ["--auto"],
+  });
+
+  console.log("MAFFT completed with code:", results.code);
+
+  //write stdout to a file in mafft-results
+  const outFile = path.join(
+    mafftTmpDir,
+   `mafft_alignment_${Date.now()}.fasta`
+  );
+  fs.writeFileSync(outFile, results.stdout || "", "utf-8");
+  console.log("MAFFT output written to:", outFile);
+  
+  return res.json({
+    tool: "MAFFT",  
+    message: "MAFFT completed successfully",
+    results: {
+      command: results.cmd,
+      outputFile: outFile,
+      stdout: results.stdout,
+      stderr: results.stderr,
+    },
+  });
+});
+
+
+//clustalw
+router.post("/clustal", uploadClustalw.single("file"), async (req, res) => {
+  const{gdata} = req.body;
+
+  const fastapath = getFastaFile({
+    file: req.file,
+    gdata,
+    outDir: clustalwTmpDir,
+    prefix: "clustalw_input"
+  });
+  if (!fastapath) {
+    return res
+      .status(400)
+      .json({ message: "Need input fasta file" });
+  }
+  console.log("ClustalW request body:", req.body);
+  
+  //outpur file type 
+  const outFile = path.join(
+    clustalwTmpDir,
+    `clustalw_alignment_${Date.now()}.aln`
+  );
+
+  //run clustalw
+  const results = await runClustalw({
+    inputFasta: fastapath,
+    cwd: clustalwTmpDir,
+    outputFile: outFile,
+    extraArgs: [],
+  });
+  
+  console.log("ClustalW completed with code:", results.code);   
+  console.log("ClustalW output written to:", outFile);
+  
+  return res.json({
+    tool: "ClustalW",  
+    message: "ClustalW completed successfully",
+    results: {
+      command: results.cmd,
+      outputFile: outFile,
+      stdout: results.stdout,
+      stderr: results.stderr,
+    },
+  });
+});
+
+
 
 module.exports = router;
 
