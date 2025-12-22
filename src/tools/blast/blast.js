@@ -1,78 +1,91 @@
 const path = require("path");
-const { runCmd } = require("../../utils/runCmd.js");
 const fs = require("fs");
 
-const blastHeaders = [
-  "query_id",
-  "subject_id",
-  "percent_identity",
-  "alignment_length",
-  "mismatches",
-  "gap_opens",
-  "q_start",
-  "q_end",
-  "s_start",
-  "s_end",
-  "evalue",
-  "bit_score"
-];
+const {SearchDatabase} = require("../../utils/search.js");   
+const {GenerateFasta} = require("../../utils/buildFasta.js");
+const {RunBlast} = require("./runBlast.js")
+const {MakeBlastDatabase} = require("./makeBlastdb.js")
 
-async function runBlast(
-    program = "blastn",
-    queryFasta,
-    outputFile,
-    dbPrefix,
-    wordSize = 28,
-    evalue = 1e-5,
-    outfmt = 6,
-    maxTargetSeqs = 5,
-) {
+
+async function blast(
+    gene,
+    type,
+    segment,
+    year,
+    tissue,
+    age,
+    state,
+    country,
+    seqType,
+    query,
+)
+ {
+    const searchResults = await SearchDatabase(gene, type, segment, year, tissue, age, state, country);
+
+    if (!searchResults.length) {
+        return { 
+            db_count: 0,
+            db_filters: { gene, type, segment, year, tissue, age, state, country },
+            hits: [],
+            message: "No sequences found for the given search filters"  
+        };
+    }
+
+    const tmpDir = path.join(__dirname, "../../../tmp/blast-results");
+    const timestamp = Date.now();
+    const base = path.join(tmpDir, `${seqType}_${timestamp}`);
+    const dbFasta    = `${base}_db.fasta`;
+    const queryFasta = `${base}_query.fasta`;
+    const out    = `${base}_blast.json`;   
+    const db      = `${base}_db`
+
+
+  
+  GenerateFasta(searchResults, seqType, dbFasta);
+
+    let cleanquery;
+    const trimmed = (query || "").trim();
+    if (trimmed.startsWith(">")) {
+       
+        cleanquery = trimmed + "\n";
+    }
+
+    else {
+        const cleanSeq = trimmed.replace(/\s+/g, "").toUpperCase();
+        cleanquery = `>query\n${cleanSeq}\n`;
+    }
+
+    fs.writeFileSync(queryFasta, cleanquery);
+
+
+    const dbType = seqType === "nt" ? "nucl" : "prot";
+    const program = seqType === "nt" ? "blastn" : "blastp";
+    const word_size = seqType === "nt" ? 28 : 7;
+
+    //casll to make balst db
+    await MakeBlastDatabase(dbFasta, db, dbType);
     
-    const args = [
-        "-query", queryFasta,
-        "-db", dbPrefix,
-        "-out", outputFile,
-        "-word_size", wordSize.toString(),
-        "-evalue", evalue.toString(),
-        "-outfmt", outfmt.toString(),
-        "-max_target_seqs", maxTargetSeqs.toString(),
-    ];
-
-    const cmd = `${program} ${args.join(" ")}`;
-    console.log("Running BLAST command:", cmd);
 
 
-
-    // const {stdout, stderr} = await runCmd( program , args);
-
-    const blastResult = fs.readFileSync("/home/jaga/reo_virusdb/backend/tmp/blast-results/blast_output_1764198990742.txt", "utf-8");
-
-    const lines = blastResult.trim().split("\n");
-
-    const parsedResults = lines.map(line => {
-    const cols = line.trim().split(/\s+/);  // split by whitespace
-    const obj = {};
-
-    blastHeaders.forEach((header, i) => {
-        obj[header] = cols[i] || null;
-    });
-
-    return obj;
-    });
-
-    console.log("Parsed BLAST results:", parsedResults);
-
-    
-    return {
-         parsedResults
-    };
-        
+  const blastOutput = await RunBlast(
+  program,
+  queryFasta,
+  out,
+  db,
+  word_size
+);
 
 
-}
+const results = JSON.parse(blastOutput);
+return results;
+
+}   
+
+module.exports = {
+  blast,
+};
 
 
-// runBlast()
 
 
-module.exports = { runBlast };
+   

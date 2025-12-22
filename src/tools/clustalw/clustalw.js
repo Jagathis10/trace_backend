@@ -1,42 +1,61 @@
-const path = require("path");
-const { runCmd } = require("../../utils/runCmd.js");
 
-const CLUSTALW_BIN = process.env.CLUSTALW_BIN || "/home/jaga/anaconda3/envs/jaga/bin/clustalw";
+const fs = require("fs");
+const {MergedFasta} = require("../../utils/mergeFasta");
+const { RunClustalW } = require("./runclustalw");
 
-async function runClustalw({ inputFasta, cwd, outputFile, extraArgs }) {
-  if (!inputFasta) {
-    throw new Error("inputFasta is required");
-  }
 
-  const outFile = outputFile || path.join(
-    cwd || path.dirname(inputFasta),
-    `clustalw_alignment_${Date.now()}.aln`
+async function clustalw(
+  gene,
+  type,
+  segment,
+  year,
+  tissue,
+  age,
+  state,
+  country,
+  seqType,
+  query
+)
+
+{
+  const built = await MergedFasta (
+    "clustalw",
+    gene,
+    type,
+    segment,
+    year,
+    tissue,
+    age,
+    state,
+    country,
+    seqType,
+    query
   );
 
-  const args = [];
-  args.push(`-INFILE=${inputFasta}`);
-  args.push(`-OUTFILE=${outFile}`);
-  args.push("-OUTPUT=FASTA");
-  args.push("-TYPE=DNA");
-
-  if (Array.isArray(extraArgs) && extraArgs.length > 0) {
-    args.push(...extraArgs);
+  if (built.db_count ===0) {
+  return { message: "no seq found" };
   }
 
-  const cmd = `${CLUSTALW_BIN} ${args.join(" ")}`;
-  console.log("Running ClustalW command:", cmd);
+ 
 
-  const { code, stdout, stderr } = await runCmd(CLUSTALW_BIN, args, {
-    cwd: cwd || path.dirname(inputFasta),
-  });
+ const clustalout = await RunClustalW(built.mergedFasta, seqType);
 
   return {
-    code,
-    stdout,
-    stderr,
-    cmd,
-    files: { input: inputFasta, output: outFile },
+    tool: "clustalw",
+    seqType: seqType,
+    db_count: built.db_count,
+
+    input_fasta: clustalout.input_fasta,
+    output_aln: clustalout.output_aln,
+    stdout_aln: clustalout.stdout_aln,
+    stderr_aln: clustalout.stderr_aln,
+
+    output_phy: clustalout.output_phy,
+    stdout_phy: clustalout.stdout_phy,
+    stderr_phy: clustalout.stderr_phy,
   };
 }
 
-module.exports = { runClustalw };
+module.exports = { clustalw };
+
+

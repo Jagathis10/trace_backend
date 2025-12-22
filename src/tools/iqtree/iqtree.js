@@ -1,54 +1,85 @@
-const path = require("path");
-const { runCmd } = require("../../utils/runCmd.js");
 
-const IQTREE_BIN = process.env.IQTREE_BIN || "/home/jaga/anaconda3/envs/jaga/bin/iqtree2";
 
-async function runIqtree({
-    inputFasta,
-    cwd,
-    datatype = "nt",  // nt or aa
-    extraArgs,
-}) {
-    if (!inputFasta) {
-        throw new Error("inputFasta is required");
-    }
+const { MergedFasta } = require("../../utils/mergeFasta");
+const { RunMafft } = require("../mafft/runMafft");
+const { RunClustalW } = require("../clustalw/runclustalw");
+const { RunIqtree } = require("./runIqtree");
 
-    const args = [];
-    args.push("-s", inputFasta);
-    args.push("-nt", "AUTO");
-//model selection based on datatype
-    if (datatype === "aa") {
-        args.push("-st", "AA");
-        args.push("-m", "LG+F+R10");   
-        args.push("--alrt", "1000");  
-        args.push("-B", "1000");      
-    } else {
-        args.push("-st", "DNA");
-        args.push("-m", "GTR+F+R10");
-        args.push("--alrt", "1000");
-        args.push("-B", "1000");
-    }
 
-// Append any extra arguments
-    if (Array.isArray(extraArgs) && extraArgs.length > 0) {
-        args.push(...extraArgs);
-    }
+async function iqtree(
+  gene, type, segment, year, tissue, age, state, country, seqType, query,
+  aligner = "mafft"
+)
+ {
+ 
+  const built = await MergedFasta(
+    "iqtree",
+    gene, type, segment, year, tissue, age, state, country,
+    seqType, query
+  );
 
-    // Final cmd
-    const cmd = `${IQTREE_BIN} ${args.join(" ")}`;
-    console.log("Running IQ-TREE command:", cmd);
-
-    const { code, stdout, stderr } = await runCmd(IQTREE_BIN, args, {
-        cwd: cwd || path.dirname(inputFasta),
-    });
-
+  if (built.db_count === 0) {
     return {
-        code,
-        stdout,
-        stderr,
-        cmd,
-        files: { input: inputFasta },
+      message: "No sequences found",
+      db_count: 0
     };
+  }
+
+ 
+  let alignmentFile = "";
+  let alignmentInfo = {};
+
+  if (aligner === "clustalw") {
+    const clustalResult = await RunClustalW(built.mergedFasta, seqType);
+    alignmentFile = clustalResult.output_phy; 
+    alignmentInfo.aligner = "clustalw";
+    alignmentInfo.output_aln = clustalResult.output_aln;
+    alignmentInfo.output_phy = clustalResult.output_phy;
+    alignmentInfo.stdout = clustalResult.stdout;
+    alignmentInfo.stderr = clustalResult.stderr;
+
+  } else { 
+    const msaFile = built.base + ".msa";
+    const mafftResult = await RunMafft(built.mergedFasta, msaFile);
+    alignmentFile = mafftResult.output_msa;    
+    alignmentInfo = { aligner, ...mafftResult };
+  }
+
+
+  const iqtreePrefix = built.base + ".iqtree"; 
+  const treeResult = await RunIqtree(alignmentFile, seqType, iqtreePrefix);
+
+
+  return {
+    tool: "iqtree",
+    seqType: seqType,
+    db_count: built.db_count,
+    input_fasta: built.mergedFasta,
+    alignment: alignmentInfo,
+    iqtree: treeResult
+  };
 }
 
-module.exports = { runIqtree };
+module.exports = { iqtree };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./src/db/index.js');
 const routes = require('./src/routes/route.js');
-const toolsRoutes = require('./src/routes/tools.js');
+
 
 const app = express();
 const apiPort = 3000;
@@ -16,10 +16,25 @@ app.use((req, res, next) => {
   next();
 });
 
+//n
+// app.use(cors({
+//   origin: "http://localhost:5173",  // allow your frontend only
+//   methods: ["GET", "POST"],
+//   allowedHeaders: ["Content-Type"]
+// }));
+
+
+app.use((req, res, next) => {
+  console.log(" Request:", req.method, req.url);
+  next();
+});
+
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 // app.use(cors("*"));
+
+
 
 app.use ("/api", routes)
 app.listen(apiPort, () => {

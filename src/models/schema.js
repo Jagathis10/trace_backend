@@ -14,7 +14,7 @@ const databaseSchema = new mongoose.Schema(
     country:{type:String},
     segment:{type:String},
     gene:{type:String},
-    Year:{type:Number},
+    year:{type:Number},
     nt_length:{type:Number},
     aa_length:{type:Number},
     nt_sequence:{type:String},

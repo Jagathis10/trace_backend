@@ -1,31 +1,47 @@
-const {spawn} = require("child_process");
 
-function runCmd(command, args = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args);
+const fs = require("fs");
+const { spawn } = require("child_process");
+
+function RunCommand(command, args = [], options = {}) {
+  return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
 
-    child.stdout.on("data", (data) => {
-        stdout += data.toString();
-        });
+    const stdio = ["ignore", "pipe", "pipe"]; //012
+    let outFd = null;
+    let errFd = null;
 
-    child.stderr.on("data", (data) => {
-        stderr += data.toString();
-        });
+    if (options.stdoutFile) {
+      outFd = fs.openSync(options.stdoutFile, "w");
+      stdio[1] = outFd;
+    }
+    if (options.stderrFile) {
+      errFd = fs.openSync(options.stderrFile, "w");
+      stdio[2] = errFd;
+    }
+
+    const child = spawn(command, args, { stdio });
+
+     child.on("error", (err) => {
+      if (outFd !== null) fs.closeSync(outFd);
+      if (errFd !== null) fs.closeSync(errFd);
+      resolve({ stdout: "", stderr: err.message });
+    });
+
+
+    if (!options.stdoutFile) {
+      child.stdout.on("data", (d) => (stdout += d.toString()));
+    }
+    if (!options.stderrFile) {
+      child.stderr.on("data", (d) => (stderr += d.toString()));
+    }
 
     child.on("close", () => {
-        const result = { stdout, stderr };
-        console.log(result);
-        if (stderr === "") {
-            resolve(result);
-        } else {
-            reject(new Error(`Command failed with  ${stderr}`));
-        }
+      if (outFd !== null) fs.closeSync(outFd);
+      if (errFd !== null) fs.closeSync(errFd);
+      resolve({ stdout, stderr });
     });
   });
-}   
+}
 
-
-
-module.exports = {runCmd};
+module.exports = { RunCommand };
